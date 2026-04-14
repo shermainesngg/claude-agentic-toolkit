@@ -11,6 +11,8 @@ Analyze the current codebase and generate a `CLAUDE.md` file that gives Claude r
 
 A well-crafted CLAUDE.md is the single highest-leverage file for improving Claude's effectiveness on a project. Without it, Claude has to rediscover the project's conventions, tech stack, and structure every conversation. With it, Claude starts each session already understanding the codebase — leading to fewer mistakes, better suggestions, and less time wasted on context-gathering.
 
+A great CLAUDE.md does two things: (1) gives Claude **project context** — what this is, how it's built, what conventions to follow — and (2) gives Claude **behavioral guardrails** — how to approach work, what failure modes to avoid, and how to verify its own output. Most CLAUDE.md files only do the first. This skill does both.
+
 ## Phased Approach
 
 Work through these four phases in order. Each phase builds on the previous one.
@@ -99,6 +101,14 @@ Dig deeper into the codebase to extract patterns and conventions.
 - Type definitions or schemas
 - Database migrations or schema files
 
+**Identify project-specific guardrails** — look for signals about how carefully the project needs to be treated:
+- Is this a library consumed by others? (breaking changes are costly — emphasize conservative changes)
+- Is there a strict test culture? (test files everywhere, CI checks — emphasize test-first approach)
+- Are there zero-dependency constraints? (`dependencies` is empty or minimal in config)
+- Is there a specific error handling pattern? (custom error types, Result patterns — must be followed exactly)
+- Are there shared packages in a monorepo? (changes ripple — emphasize checking consumers)
+- Is there a migration or deprecation in progress? (comments, TODO markers, dual implementations)
+
 ---
 
 ### Phase 3: GENERATE
@@ -131,6 +141,45 @@ Create `CLAUDE.md` at the project root. Adapt the content to what you actually f
 
 6. **Key Files** — Files that are especially important to understand when working on this project, with a one-line explanation of each.
 
+7. **Behavioral Guidelines** — Rules that govern *how* Claude should work on this project, structured around common LLM failure modes. This section prevents the most costly mistakes. Adapt the following four principles to the project's context:
+
+   **Think Before Coding**
+   - State assumptions explicitly before implementing. If uncertain, ask.
+   - If multiple interpretations exist, present them with tradeoffs — don't pick silently.
+   - If a simpler approach exists, say so. Push back when warranted.
+   - If something is unclear, stop. Name what's confusing. Ask.
+
+   **Simplicity First**
+   - No features beyond what was asked.
+   - No abstractions for single-use code.
+   - No "flexibility" or "configurability" that wasn't requested.
+   - No error handling for impossible scenarios.
+   - Self-test: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+   **Surgical Changes**
+   - When editing existing code, only change what's necessary for the task.
+   - Don't "improve" adjacent code, comments, or formatting.
+   - Don't refactor things that aren't broken. Match existing style.
+   - If you notice unrelated issues, mention them — don't fix them silently.
+   - Remove imports/variables/functions that YOUR changes made unused. Don't remove pre-existing dead code unless asked.
+   - Self-test: every changed line should trace directly to the user's request.
+
+   **Goal-Driven Execution**
+   - Transform vague requests into verifiable goals before starting. (e.g., "Add validation" becomes "Write tests for invalid inputs, then make them pass")
+   - For multi-step tasks, state a brief plan with verification at each step:
+     ```
+     1. [Step] -> verify: [check]
+     2. [Step] -> verify: [check]
+     ```
+   - Strong success criteria enable autonomous looping. Weak criteria ("make it work") require clarification first.
+
+   When writing this section, tailor the principles to the project. For example:
+   - A library project might emphasize: "Don't add dependencies without asking — this is a zero-dependency package"
+   - A production API might emphasize: "Always write a failing test before fixing a bug"
+   - A monorepo might emphasize: "Changes to shared packages require checking downstream consumers"
+
+   Note in the CLAUDE.md that these guidelines bias toward caution over speed, and that trivial tasks (typo fixes, obvious one-liners) don't need the full rigor.
+
 **Optional sections** (add only when relevant):
 
 - **Architecture** — For complex apps: how the system is structured, data flow, key design decisions
@@ -145,7 +194,10 @@ Create `CLAUDE.md` at the project root. Adapt the content to what you actually f
 - Be concrete — show actual file paths, actual command names, actual patterns from the code
 - Don't duplicate other docs — if there's a detailed API doc or architecture doc, link to it rather than repeating it
 - Focus on what Claude needs to know to write code that fits in — patterns, conventions, and gotchas
-- Keep it under 200 lines if possible. Shorter is better, as long as the important context is there
+- Structure behavioral rules around **specific failure modes**, not generic best practices. Each rule should prevent a concrete mistake.
+- Use short, imperative sentences for rules. "Don't assume file format — ask." beats "It would be preferable to clarify the file format with the user before proceeding."
+- Include **self-test heuristics** where possible — questions Claude can ask itself to verify its own output
+- Keep it under 250 lines if possible. Shorter is better, as long as the important context is there
 
 ---
 
@@ -167,14 +219,19 @@ After generating the file, report back to the user:
 ### Structure Overview
 {Brief description of how the code is organized}
 
+### Behavioral Guidelines
+{Summary of which guardrails were included and why — e.g., "Emphasized test-first approach because the project has comprehensive test coverage" or "Added conservative change rules because this is a published library"}
+
 ### What's Included
 {List of sections generated and why}
 
 ### Next Steps
 1. Review the generated `CLAUDE.md` and correct anything that's off
-2. Add project-specific notes that aren't discoverable from code alone (e.g., "we're migrating from X to Y", "don't use library Z because of issue W")
-3. Remove any sections that aren't useful for your project
-4. Consider adding on-demand context pointers for large reference docs
+2. **Review the behavioral guidelines** — adjust strictness to match your team's preferences. The defaults bias toward caution; loosen them for fast-moving prototypes, tighten them for production systems.
+3. Add project-specific notes that aren't discoverable from code alone (e.g., "we're migrating from X to Y", "don't use library Z because of issue W")
+4. Add any team-specific behavioral rules (e.g., "always create a failing test before fixing a bug", "never add dependencies without approval")
+5. Remove any sections that aren't useful for your project
+6. Consider adding on-demand context pointers for large reference docs
 ```
 
 ---
